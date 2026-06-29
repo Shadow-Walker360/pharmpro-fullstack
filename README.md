@@ -103,16 +103,25 @@ npm run db:reset
 
 ## Frontend (Vite + React)
 
+Exact scripts (from web/src/package.json):
+
 ```bash
-cd web/src
-npm install
+# location: web/src/package.json
+# install deps
+cd web/src && npm install
+
 # start dev server (Vite)
 npm run dev
 
 # build production bundle
 npm run build
+
+# preview production build
+npm run preview
+
+# typecheck only
+npm run typecheck
 ```
-(Check `web/src/package.json` for exact script names if different — `npm run dev` and `npm run build` are typical.)
 
 ## Environment variables (high level)
 See `app/api/.env.example` for the full list. Important ones:
