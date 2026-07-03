@@ -1,43 +1,13 @@
-// ════════════════════════════════════════════════════════════
-// apps/web/src/index.css
-// ════════════════════════════════════════════════════════════
-/*
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  * { @apply box-border m-0 p-0; }
-  body { @apply bg-bg text-text font-sans text-sm antialiased; }
-  ::-webkit-scrollbar { width: 5px; height: 5px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { @apply bg-bg4 rounded-full; }
-}
-
-@layer components {
-  .glass { @apply bg-bg3/70 backdrop-blur-glass border border-border; }
-  .glass-card { @apply glass rounded-xl shadow-glass; }
-  .shimmer {
-    background: linear-gradient(90deg,
-      rgba(255,255,255,.04) 25%,
-      rgba(255,255,255,.08) 50%,
-      rgba(255,255,255,.04) 75%
-    );
-    background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
-  }
-  @keyframes shimmer { 0% { background-position:200% 0 } 100% { background-position:-200% 0 } }
-  .page-enter { animation: pageIn .22s ease; }
-  @keyframes pageIn {
-    from { opacity:0; transform:translateY(6px); }
-    to   { opacity:1; transform:translateY(0); }
+  * {
+    @apply box-border m-0 p-0;
   }
 }
 
-@layer utilities {
-  .scrollbar-thin { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.1) transparent; }
-  .bg-gradient-radial { background: radial-gradient(circle,var(--tw-gradient-stops)); }
+body {
+  @apply bg-bg text-text font-sans text-sm antialiased;
 }
-*/
-
-

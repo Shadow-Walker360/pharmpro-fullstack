@@ -3,11 +3,13 @@
 // Axios instance — attaches JWT, handles 401 refresh flow,
 // retries once with fresh token before failing.
 // ════════════════════════════════════════════════════════════
-import axios, {
+import axios from 'axios'
+
+import type {
   AxiosInstance,
   InternalAxiosRequestConfig,
   AxiosError,
-}                         from 'axios'
+} from 'axios'
 import { useAuthStore }   from '../store/auth.store'
 
 const BASE = import.meta.env.VITE_API_URL ?? '/api'
