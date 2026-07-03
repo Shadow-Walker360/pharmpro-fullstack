@@ -4,8 +4,8 @@
 // ════════════════════════════════════════════════════════════
 import { Outlet }          from 'react-router-dom'
 import { useEffect }       from 'react'
-import Sidebar             from '../components/layout/Sidebar'
-import Topbar              from '../components/layout/Topbar'
+import Sidebar             from '../components/layouts/Sidebar'
+import Topbar              from '../components/layouts/Topbar'
 import { getSocket }       from '../lib/socket'
 import { useAuthStore }    from '../store/auth.store'
 import { queryClient }     from '../lib/queryClient'

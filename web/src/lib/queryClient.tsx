@@ -1,8 +1,4 @@
-/ ════════════════════════════════════════════════════════════
-// apps/web/src/lib/queryClient.ts
-// React Query client — global cache config
-// ════════════════════════════════════════════════════════════
-import /{ QueryClient } from '@tanstack/react-query'
+import { QueryClient } from '@tanstack/react-query'
 
 export const queryClient = new QueryClient({
   defaultOptions: {

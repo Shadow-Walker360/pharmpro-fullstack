@@ -1,0 +1,184 @@
+enum ClaimStatus {
+  DRAFT             // being assembled, not yet sent to payer
+  SUBMITTED         // sent to payer, awaiting response
+  UNDER_REVIEW      // payer has acknowledged, reviewing
+  APPROVED          // full amount approved
+  PARTIALLY_APPROVED
+  REJECTED
+  PAID              // payer has actually disbursed funds
+  APPEALED          // rejection contested, back under review
+  CANCELLED         // withdrawn before submission
+}
+
+enum PreAuthStatus {
+  NOT_REQUIRED
+  PENDING
+  APPROVED
+  DENIED
+}
+
+enum ClaimantRelationship {
+  SELF
+  SPOUSE
+  CHILD
+  DEPENDENT
+}
+
+model InsurancePayer {
+  id                  String    @id @default(cuid())
+  name                String    // "NHIF", "AAR Insurance", "UAP Old Mutual", "Jubilee"
+  code                String    // "NHIF", "AAR", "UAP" — short code printed on claim forms
+  contactEmail        String?
+  contactPhone        String?
+  preAuthRequired     Boolean   @default(false)
+  defaultCopayPercent Decimal   @default(0) @db.Decimal(5, 2)
+  claimPortalUrl      String?
+  averageSettlementDays Int?    // rolling average, updated by a nightly job — used for aging reports
+  isActive            Boolean   @default(true)
+
+  branchId            String
+  branch              Branch    @relation(fields: [branchId], references: [id])
+
+  claims              InsuranceClaim[]
+
+  createdAt           DateTime  @default(now())
+  updatedAt            DateTime @updatedAt
+  deletedAt           DateTime?
+
+  @@unique([branchId, code])
+  @@index([branchId])
+}
+
+model InsuranceClaim {
+  id                      String    @id @default(cuid())
+  claimNumber             String    @unique // CLM-2026-ELD-000001, sequential per branch via Redis INCR
+
+  branchId                String
+  branch                  Branch    @relation(fields: [branchId], references: [id])
+
+  patientId               String
+  patient                 Patient   @relation(fields: [patientId], references: [id])
+
+  payerId                 String
+  payer                   InsurancePayer @relation(fields: [payerId], references: [id])
+
+  saleId                  String?
+  sale                    Sale?     @relation(fields: [saleId], references: [id])
+
+  prescriptionId          String?
+  prescription            Prescription? @relation(fields: [prescriptionId], references: [id])
+
+  policyNumber            String
+  memberNumber            String
+  principalMemberName     String
+  relationshipToPrincipal ClaimantRelationship @default(SELF)
+
+  preAuthStatus           PreAuthStatus @default(NOT_REQUIRED)
+  preAuthCode             String?
+  preAuthRequestedAt      DateTime?
+  preAuthRespondedAt      DateTime?
+
+  claimedAmount           Decimal   @db.Decimal(12, 2)
+  approvedAmount          Decimal?  @db.Decimal(12, 2)
+  copayAmount             Decimal   @default(0) @db.Decimal(12, 2)
+
+  status                  ClaimStatus @default(DRAFT)
+  rejectionReason         String?
+  rejectionCode           String?   // payer-specific rejection code, for pattern analysis
+
+  submittedAt             DateTime?
+  respondedAt             DateTime?
+  paidAt                  DateTime?
+  paymentReference        String?
+
+  items                   ClaimItem[]
+  statusHistory           ClaimStatusHistory[]
+
+  createdById             String
+  createdBy               User      @relation("ClaimCreatedBy", fields: [createdById], references: [id])
+
+  createdAt               DateTime  @default(now())
+  updatedAt                DateTime @updatedAt
+  deletedAt                DateTime?
+
+  @@index([branchId, status])
+  @@index([patientId])
+  @@index([payerId, status])
+  @@index([submittedAt])
+}
+
+model ClaimItem {
+  id              String   @id @default(cuid())
+
+  claimId         String
+  claim           InsuranceClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  drugId          String
+  drug            Drug     @relation(fields: [drugId], references: [id])
+  drugName        String   // snapshot at claim time — drug names/prices change, claims must not
+  quantity        Int
+  unitPrice       Decimal  @db.Decimal(10, 2)
+  totalAmount     Decimal  @db.Decimal(12, 2)
+  approvedAmount  Decimal? @db.Decimal(12, 2)
+  rejectionReason String?
+
+  @@index([claimId])
+}
+
+model ClaimStatusHistory {
+  id          String       @id @default(cuid())
+
+  claimId     String
+  claim       InsuranceClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  fromStatus  ClaimStatus?
+  toStatus    ClaimStatus
+  notes       String?
+
+  changedById String
+  changedBy   User         @relation("ClaimStatusChangedBy", fields: [changedById], references: [id])
+
+  createdAt   DateTime     @default(now())
+
+  @@index([claimId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// ALSO ADD these relation fields to existing models:
+//
+// model Branch {
+//   ...existing fields...
+//   insurancePayers  InsurancePayer[]
+//   insuranceClaims  InsuranceClaim[]
+// }
+//
+// model Patient {
+//   ...existing fields...
+//   insuranceClaims  InsuranceClaim[]
+// }
+//
+// model Sale {
+//   ...existing fields...
+//   insuranceClaims  InsuranceClaim[]
+// }
+//
+// model Prescription {
+//   ...existing fields...
+//   insuranceClaims  InsuranceClaim[]
+// }
+//
+// model Drug {
+//   ...existing fields...
+//   claimItems       ClaimItem[]
+// }
+//
+// model User {
+//   ...existing fields...
+//   claimsCreated       InsuranceClaim[]      @relation("ClaimCreatedBy")
+//   claimStatusChanges  ClaimStatusHistory[]  @relation("ClaimStatusChangedBy")
+// }
+//
+// MIGRATION NOTE: if you already have data sitting in the AuditLog jsonb
+// placeholder, write a one-off backfill script before dropping that code path —
+// don't delete the old claims data until it's migrated into InsuranceClaim rows.
+// ─────────────────────────────────────────────────────────────────────────

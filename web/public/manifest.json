@@ -1,0 +1,43 @@
+{
+  "name": "PharmPro Enterprise",
+  "short_name": "PharmPro",
+  "description": "Full-stack pharmacy management system — POS, prescriptions, inventory, and clinical safety checks.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#0d9488",
+  "lang": "en-KE",
+  "dir": "ltr",
+  "categories": ["business", "medical", "productivity"],
+  "icons": [
+    { "src": "/icons/icon-72.png", "sizes": "72x72", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-96.png", "sizes": "96x96", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-128.png", "sizes": "128x128", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-192-maskable.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "screenshots": [
+    { "src": "/screenshots/dashboard-wide.png", "sizes": "1280x800", "type": "image/png", "form_factor": "wide" },
+    { "src": "/screenshots/pos-narrow.png", "sizes": "412x915", "type": "image/png", "form_factor": "narrow" }
+  ],
+  "shortcuts": [
+    {
+      "name": "New Sale",
+      "short_name": "POS",
+      "description": "Jump straight into the Point of Sale screen",
+      "url": "/pos",
+      "icons": [{ "src": "/icons/shortcut-pos.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "New Prescription",
+      "short_name": "New Rx",
+      "description": "Enter a new prescription",
+      "url": "/prescriptions/new",
+      "icons": [{ "src": "/icons/shortcut-rx.png", "sizes": "96x96" }]
+    }
+  ]
+}
