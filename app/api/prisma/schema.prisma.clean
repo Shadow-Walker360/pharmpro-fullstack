@@ -1,0 +1,942 @@
+// ============================================================
+// PharmPro Enterprise
+// Prisma Schema
+// Database: PostgreSQL
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  PHARMACIST
+  DOCTOR
+  CASHIER
+  STORE_MANAGER
+  LAB_TECHNICIAN
+  ACCOUNTANT
+  RECEPTIONIST
+}
+
+enum UserStatus {
+  ACTIVE
+  PENDING
+  SUSPENDED
+  LOCKED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum PaymentMethod {
+  CASH
+  MPESA
+  CARD
+  BANK_TRANSFER
+  INSURANCE
+}
+
+enum SaleStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum StockMovementType {
+  PURCHASE
+  SALE
+  RETURN
+  ADJUSTMENT
+  TRANSFER
+  EXPIRED
+  DAMAGED
+}
+
+enum PrescriptionStatus {
+  DRAFT
+  PENDING
+  VERIFIED
+  DISPENSING
+  DISPENSED
+  COMPLETED
+  CANCELLED
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  SENT
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+enum ExpenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  EXPORT
+  PRINT
+}
+
+enum ClaimStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  PARTIALLY_APPROVED
+  REJECTED
+  PAID
+  APPEALED
+  CANCELLED
+}
+
+enum PreAuthStatus {
+  NOT_REQUIRED
+  PENDING
+  APPROVED
+  DENIED
+}
+
+enum ClaimantRelationship {
+  SELF
+  SPOUSE
+  CHILD
+  DEPENDENT
+}
+
+enum ClaimPriority {
+  NORMAL
+  URGENT
+}
+
+enum BloodGroup {
+  A_POSITIVE
+  A_NEGATIVE
+  B_POSITIVE
+  B_NEGATIVE
+  AB_POSITIVE
+  AB_NEGATIVE
+  O_POSITIVE
+  O_NEGATIVE
+}
+
+enum DrugCategory {
+  ANALGESIC
+  ANTIBIOTIC
+  ANTIFUNGAL
+  ANTIVIRAL
+  ANTIHISTAMINE
+  ANTIHYPERTENSIVE
+  ANTIDIABETIC
+  VITAMIN
+  VACCINE
+  SUPPLEMENT
+  OTHER
+}
+
+enum DosageForm {
+  TABLET
+  CAPSULE
+  SYRUP
+  SUSPENSION
+  INJECTION
+  CREAM
+  OINTMENT
+  DROPS
+  INHALER
+  POWDER
+  GEL
+  PATCH
+  OTHER
+}
+
+enum InventoryMovementType {
+  PURCHASE
+  SALE
+  ADJUSTMENT
+  RETURN
+  TRANSFER
+  EXPIRED
+  DAMAGED
+}
+
+enum PurchaseStatus {
+  PENDING
+  ORDERED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+enum PrescriptionPriority {
+  LOW
+  NORMAL
+  HIGH
+  EMERGENCY
+}
+
+enum SaleType {
+  CASH
+  MPESA
+  CARD
+  INSURANCE
+  CREDIT
+}
+
+// ============================================================
+// CORE MODELS
+// ============================================================
+
+model Branch {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  phone     String?
+  email     String?
+  address   String?
+  city      String?
+  county    String?
+  isActive  Boolean  @default(true)
+
+  users             User[]
+  patients          Patient[]
+  drugs             Drug[]
+  inventoryItems    Inventory[]
+  inventoryBatches  InventoryBatch[]
+  purchases         Purchase[]
+  prescriptions     Prescription[]
+  sales             Sale[]
+  insurancePayers   InsurancePayer[]
+  insuranceClaims   InsuranceClaim[]
+  expenses          Expense[]
+  payments          Payment[]
+  auditLogs         AuditLog[]
+  stockMovements    StockMovement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([code])
+}
+
+model User {
+  id           String   @id @default(cuid())
+  firstName    String
+  lastName     String
+  email        String   @unique
+  phone        String?
+  passwordHash String
+  role         UserRole
+  status       UserStatus @default(ACTIVE)
+  isActive     Boolean  @default(true)
+  lastLoginAt  DateTime?
+
+  branchId     String
+  branch       Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  refreshTokens            RefreshToken[]
+  doctorPrescriptions      Prescription[] @relation("DoctorPrescriptions")
+  pharmacistPrescriptions  Prescription[] @relation("PharmacistPrescriptions")
+  sales                    Sale[] @relation("CashierSales")
+  purchases                Purchase[]
+  expenses                 Expense[]
+  payments                 Payment[]
+  stockMovements           StockMovement[]
+  attachments              Attachment[]
+  auditLogs                AuditLog[]
+  claimsCreated            InsuranceClaim[] @relation("ClaimCreatedBy")
+  claimStatusChanges       ClaimStatusHistory[] @relation("ClaimStatusChangedBy")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([branchId])
+  @@index([email])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model AuditLog {
+  id          String      @id @default(cuid())
+  action      AuditAction
+  tableName   String
+  recordId    String
+  description String?
+  ipAddress   String?
+  userAgent   String?
+  userId      String?
+  user        User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  branchId    String?
+  branch      Branch?     @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  createdAt   DateTime    @default(now())
+
+  @@index([tableName])
+  @@index([recordId])
+  @@index([createdAt])
+}
+
+// ============================================================
+// PATIENTS
+// ============================================================
+
+model Patient {
+  id                String      @id @default(cuid())
+  patientNumber     String      @unique
+  firstName         String
+  lastName          String
+  gender            Gender
+  dateOfBirth       DateTime?
+  nationalId        String?
+  phone             String?
+  email             String?
+  address           String?
+  city              String?
+  emergencyContact  String?
+  emergencyPhone    String?
+  bloodGroup        BloodGroup?
+  allergies         String?
+  chronicConditions String?
+  height            Float?
+  weight            Float?
+  isActive          Boolean     @default(true)
+
+  branchId          String
+  branch            Branch      @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  prescriptions     Prescription[]
+  sales             Sale[]
+  insuranceClaims   InsuranceClaim[]
+  allergiesRecords  PatientAllergy[]
+  conditionsRecords PatientCondition[]
+  visits            PatientVisit[]
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  deletedAt         DateTime?
+
+  @@index([branchId])
+  @@index([lastName])
+  @@index([phone])
+}
+
+model PatientAllergy {
+  id        String   @id @default(cuid())
+  patientId String
+  patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  allergy   String
+  severity  String?
+  notes     String?
+  createdAt DateTime @default(now())
+
+  @@index([patientId])
+}
+
+model PatientCondition {
+  id          String   @id @default(cuid())
+  patientId   String
+  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  condition   String
+  diagnosedOn DateTime?
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  @@index([patientId])
+}
+
+model PatientVisit {
+  id             String   @id @default(cuid())
+  patientId      String
+  patient        Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  visitDate      DateTime @default(now())
+  chiefComplaint String?
+  diagnosis      String?
+  notes          String?
+  createdAt      DateTime @default(now())
+
+  @@index([patientId])
+}
+
+// ============================================================
+// DRUGS / INVENTORY
+// ============================================================
+
+model DrugCategory {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+  drugs       Drug[]
+}
+
+model Manufacturer {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  country   String?
+  email     String?
+  phone     String?
+  website   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+  drugs     Drug[]
+}
+
+model Drug {
+  id                   String   @id @default(cuid())
+  name                 String
+  genericName          String?
+  brand                String?
+  sku                  String   @unique
+  barcode              String?  @unique
+  categoryId           String?
+  category             DrugCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  dosageForm           DosageForm
+  strength             String
+  manufacturerId       String?
+  manufacturer         Manufacturer? @relation(fields: [manufacturerId], references: [id], onDelete: SetNull)
+  requiresPrescription Boolean  @default(false)
+  minimumStock         Int      @default(0)
+  reorderLevel         Int      @default(0)
+  costPrice            Decimal  @db.Decimal(12,2)
+  sellingPrice         Decimal  @db.Decimal(12,2)
+  taxRate              Decimal  @default(0) @db.Decimal(5,2)
+  isActive             Boolean  @default(true)
+
+  branchId             String
+  branch               Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  inventoryItems       Inventory[]
+  inventoryBatches     InventoryBatch[]
+  prescriptionItems    PrescriptionItem[]
+  saleItems            SaleItem[]
+  purchaseItems        PurchaseItem[]
+  claimItems           ClaimItem[]
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  deletedAt            DateTime?
+
+  @@unique([branchId, sku])
+  @@index([branchId])
+  @@index([name])
+  @@index([sku])
+  @@index([barcode])
+}
+
+model Inventory {
+  id               String   @id @default(cuid())
+  drugId           String
+  drug             Drug     @relation(fields: [drugId], references: [id], onDelete: Restrict)
+  branchId         String
+  branch           Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  batchNumber      String
+  supplierBatch    String?
+  quantity         Int
+  reservedQuantity Int      @default(0)
+  unitCost         Decimal  @db.Decimal(12,2)
+  manufactureDate  DateTime?
+  expiryDate       DateTime
+  purchaseItemId   String?
+  purchaseItem     PurchaseItem? @relation(fields: [purchaseItemId], references: [id], onDelete: SetNull)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  deletedAt        DateTime?
+
+  @@unique([drugId, branchId, batchNumber])
+  @@index([drugId])
+  @@index([branchId])
+  @@index([expiryDate])
+  @@index([batchNumber])
+}
+
+model InventoryBatch {
+  id                String   @id @default(cuid())
+  batchNumber       String
+  expiryDate        DateTime
+  quantityReceived  Int
+  quantityRemaining Int
+  unitCost          Decimal  @db.Decimal(12,2)
+
+  drugId            String
+  drug              Drug     @relation(fields: [drugId], references: [id], onDelete: Restrict)
+
+  branchId          String
+  branch            Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  purchaseId        String?
+  purchase          Purchase? @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+
+  stockMovements    StockMovement[]
+  saleItems         SaleItem[]
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
+
+  @@unique([drugId, batchNumber])
+  @@index([drugId])
+  @@index([expiryDate])
+  @@index([branchId])
+}
+
+model StockMovement {
+  id            String            @id @default(cuid())
+  type          StockMovementType
+  quantity      Int
+  balanceAfter  Int
+  reference     String?
+  notes         String?
+  batchId       String
+  batch         InventoryBatch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  createdById   String?
+  createdBy     User?             @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  branchId      String?
+  branch        Branch?           @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  createdAt     DateTime          @default(now())
+
+  @@index([batchId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// ============================================================
+// PRESCRIPTIONS
+// ============================================================
+
+model Prescription {
+  id                 String   @id @default(cuid())
+  prescriptionNumber String   @unique
+  patientId          String
+  patient            Patient  @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  branchId           String
+  branch             Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  prescribedById     String
+  prescribedBy       User     @relation("DoctorPrescriptions", fields: [prescribedById], references: [id], onDelete: Restrict)
+  dispensedById      String?
+  dispensedBy        User?    @relation("PharmacistPrescriptions", fields: [dispensedById], references: [id], onDelete: SetNull)
+  diagnosis          String?
+  notes              String?
+  status             PrescriptionStatus @default(PENDING)
+  priority           PrescriptionPriority @default(NORMAL)
+  prescribedAt       DateTime @default(now())
+  dispensedAt        DateTime?
+  items              PrescriptionItem[]
+  attachments        Attachment[]
+  saleId             String?
+  sale               Sale?    @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  insuranceClaims    InsuranceClaim[]
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  deletedAt          DateTime?
+
+  @@index([patientId])
+  @@index([branchId])
+  @@index([status])
+  @@index([prescribedAt])
+}
+
+model PrescriptionItem {
+  id                  String   @id @default(cuid())
+  prescriptionId      String
+  prescription        Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Restrict)
+  drugId              String
+  drug                Drug     @relation(fields: [drugId], references: [id], onDelete: Restrict)
+  drugName            String
+  dosage              String
+  frequency           String
+  duration            String
+  instructions        String?
+  quantityPrescribed  Int
+  quantityDispensed   Int      @default(0)
+  unitPrice           Decimal? @db.Decimal(10,2)
+  totalPrice          Decimal? @db.Decimal(12,2)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([prescriptionId])
+  @@index([drugId])
+}
+
+model Attachment {
+  id            String   @id @default(cuid())
+  prescriptionId String
+  prescription  Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  fileName      String
+  originalName  String
+  mimeType      String
+  fileSize      Int
+  url           String
+  uploadedById  String
+  uploadedBy    User     @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  createdAt     DateTime @default(now())
+
+  @@index([prescriptionId])
+}
+
+// ============================================================
+// SUPPLIERS / PURCHASES
+// ============================================================
+
+model Supplier {
+  id            String   @id @default(cuid())
+  name          String
+  code          String   @unique
+  contactPerson String?
+  email         String?
+  phone         String?
+  address       String?
+  kraPin        String?
+  licenseNumber String?
+  isActive      Boolean  @default(true)
+  branchId      String
+  branch        Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  purchases     Purchase[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  @@unique([branchId, code])
+  @@index([branchId])
+  @@index([name])
+}
+
+model Purchase {
+  id                  String   @id @default(cuid())
+  purchaseNumber      String   @unique
+  supplierInvoiceNo  String?
+  orderDate           DateTime @default(now())
+  expectedDelivery    DateTime?
+  receivedDate        DateTime?
+  status              PurchaseStatus @default(PENDING)
+  supplierId          String
+  supplier            Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  branchId            String
+  branch              Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  createdById         String
+  createdBy           User     @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  subtotal            Decimal  @db.Decimal(12,2)
+  discountAmount      Decimal  @default(0) @db.Decimal(12,2)
+  taxAmount           Decimal  @default(0) @db.Decimal(12,2)
+  shippingCost        Decimal  @default(0) @db.Decimal(12,2)
+  totalAmount         Decimal  @db.Decimal(12,2)
+  amountPaid          Decimal  @default(0) @db.Decimal(12,2)
+  balanceDue          Decimal  @default(0) @db.Decimal(12,2)
+  notes               String?
+  items               PurchaseItem[]
+  inventoryBatches    InventoryBatch[]
+  payments            Payment[]
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  deletedAt           DateTime?
+
+  @@index([purchaseNumber])
+  @@index([supplierId])
+  @@index([branchId])
+  @@index([status])
+  @@index([orderDate])
+}
+
+model PurchaseItem {
+  id                String   @id @default(cuid())
+  purchaseId        String
+  purchase          Purchase @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
+  drugId            String
+  drug              Drug     @relation(fields: [drugId], references: [id], onDelete: Restrict)
+  drugName          String
+  quantityOrdered   Int
+  quantityReceived  Int      @default(0)
+  unitCost          Decimal  @db.Decimal(10,2)
+  sellingPrice      Decimal  @db.Decimal(10,2)
+  totalCost         Decimal  @db.Decimal(12,2)
+  batchNumber       String
+  manufactureDate   DateTime?
+  expiryDate        DateTime
+  inventoryItems    Inventory[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([purchaseId])
+  @@index([drugId])
+  @@index([expiryDate])
+  @@index([batchNumber])
+}
+
+// ============================================================
+// SALES / PAYMENTS / INSURANCE
+// ============================================================
+
+model Sale {
+  id              String   @id @default(cuid())
+  receiptNumber   String   @unique
+  patientId       String?
+  patient         Patient? @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  branchId        String
+  branch          Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  cashierId       String
+  cashier         User     @relation("CashierSales", fields: [cashierId], references: [id], onDelete: Restrict)
+  paymentMethod   PaymentMethod
+  status          SaleStatus @default(COMPLETED)
+  subtotal        Decimal  @db.Decimal(12,2)
+  discountAmount  Decimal  @default(0) @db.Decimal(12,2)
+  taxAmount       Decimal  @default(0) @db.Decimal(12,2)
+  totalAmount     Decimal  @db.Decimal(12,2)
+  amountPaid      Decimal  @default(0) @db.Decimal(12,2)
+  changeGiven     Decimal  @default(0) @db.Decimal(12,2)
+  notes           String?
+  mpesaReceipt    String?
+  prescriptionId  String?
+  prescription    Prescription? @relation(fields: [prescriptionId], references: [id], onDelete: SetNull)
+  items           SaleItem[]
+  payments        Payment[]
+  insuranceClaims InsuranceClaim[]
+  refunds         Refund[]
+  returns         Return[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  @@index([receiptNumber])
+  @@index([patientId])
+  @@index([branchId])
+  @@index([cashierId])
+  @@index([createdAt])
+  @@index([status])
+}
+
+model SaleItem {
+  id              String   @id @default(cuid())
+  saleId          String
+  sale            Sale     @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  drugId          String
+  drug            Drug     @relation(fields: [drugId], references: [id], onDelete: Restrict)
+  drugName        String
+  batchId         String
+  batch           InventoryBatch @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  quantity        Int
+  unitCost        Decimal  @db.Decimal(10,2)
+  unitPrice       Decimal  @db.Decimal(10,2)
+  discountAmount  Decimal  @default(0) @db.Decimal(10,2)
+  totalAmount     Decimal  @db.Decimal(12,2)
+  createdAt       DateTime @default(now())
+
+  @@index([saleId])
+  @@index([drugId])
+  @@index([batchId])
+}
+
+model Payment {
+  id               String   @id @default(cuid())
+  amount           Decimal  @db.Decimal(12,2)
+  method           PaymentMethod
+  reference        String?
+  saleId           String?
+  sale             Sale?    @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  purchaseId       String?
+  purchase         Purchase? @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  expenseId        String?
+  expense          Expense? @relation(fields: [expenseId], references: [id], onDelete: SetNull)
+  insuranceClaimId String?
+  insuranceClaim   InsuranceClaim? @relation(fields: [insuranceClaimId], references: [id], onDelete: SetNull)
+  paidAt           DateTime @default(now())
+  createdById      String?
+  createdBy        User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  branchId         String?
+  branch           Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  deletedAt        DateTime?
+
+  @@index([saleId])
+  @@index([purchaseId])
+  @@index([expenseId])
+  @@index([insuranceClaimId])
+}
+
+model Expense {
+  id            String   @id @default(cuid())
+  expenseNumber String   @unique
+  branchId      String
+  branch        Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  category      String
+  description   String?
+  amount        Decimal  @db.Decimal(12,2)
+  status        ExpenseStatus @default(PENDING)
+  paymentMethod PaymentMethod?
+  paidAt        DateTime?
+  createdById   String
+  createdBy     User     @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  payments      Payment[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  @@index([branchId])
+  @@index([status])
+}
+
+model Refund {
+  id            String   @id @default(cuid())
+  refundNumber  String   @unique
+  saleId        String
+  sale          Sale     @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  amount        Decimal  @db.Decimal(12,2)
+  reason        String?
+  status        SaleStatus @default(CANCELLED)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  @@index([saleId])
+}
+
+model Return {
+  id            String   @id @default(cuid())
+  returnNumber  String   @unique
+  saleId        String
+  sale          Sale     @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  amount        Decimal  @db.Decimal(12,2)
+  reason        String?
+  status        SaleStatus @default(CANCELLED)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  @@index([saleId])
+}
+
+model InsurancePayer {
+  id                    String   @id @default(cuid())
+  name                  String
+  code                  String
+  contactEmail          String?
+  contactPhone          String?
+  preAuthRequired       Boolean  @default(false)
+  defaultCopayPercent   Decimal  @default(0) @db.Decimal(5,2)
+  claimPortalUrl        String?
+  averageSettlementDays Int?
+  isActive              Boolean  @default(true)
+  branchId              String
+  branch                Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  claims                InsuranceClaim[]
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  deletedAt             DateTime?
+
+  @@unique([branchId, code])
+  @@index([branchId])
+}
+
+model InsuranceClaim {
+  id                      String   @id @default(cuid())
+  claimNumber             String   @unique
+  branchId                String
+  branch                  Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  patientId               String
+  patient                 Patient  @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  payerId                 String
+  payer                   InsurancePayer @relation(fields: [payerId], references: [id], onDelete: Restrict)
+  saleId                  String?
+  sale                    Sale?    @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  prescriptionId          String?
+  prescription            Prescription? @relation(fields: [prescriptionId], references: [id], onDelete: SetNull)
+  policyNumber            String
+  memberNumber            String
+  principalMemberName     String
+  relationshipToPrincipal ClaimantRelationship @default(SELF)
+  preAuthStatus           PreAuthStatus @default(NOT_REQUIRED)
+  preAuthCode             String?
+  claimedAmount           Decimal  @db.Decimal(12,2)
+  approvedAmount          Decimal? @db.Decimal(12,2)
+  copayAmount             Decimal  @default(0) @db.Decimal(12,2)
+  priority                ClaimPriority @default(NORMAL)
+  status                  ClaimStatus @default(DRAFT)
+  rejectionReason         String?
+  rejectionCode           String?
+  submittedAt             DateTime?
+  respondedAt             DateTime?
+  paidAt                  DateTime?
+  paymentReference        String?
+  items                   ClaimItem[]
+  statusHistory           ClaimStatusHistory[]
+  payments                Payment[]
+  createdById             String
+  createdBy               User     @relation("ClaimCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  deletedAt               DateTime?
+
+  @@index([branchId])
+  @@index([patientId])
+  @@index([payerId])
+  @@index([status])
+}
+
+model ClaimItem {
+  id              String   @id @default(cuid())
+  claimId         String
+  claim           InsuranceClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  drugId          String
+  drug            Drug     @relation(fields: [drugId], references: [id], onDelete: Restrict)
+  drugName        String
+  quantity        Int
+  unitPrice       Decimal  @db.Decimal(10,2)
+  totalAmount     Decimal  @db.Decimal(12,2)
+  approvedAmount  Decimal? @db.Decimal(12,2)
+  rejectionReason String?
+
+  @@index([claimId])
+}
+
+model ClaimStatusHistory {
+  id          String   @id @default(cuid())
+  claimId     String
+  claim       InsuranceClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  fromStatus  ClaimStatus?
+  toStatus    ClaimStatus
+  notes       String?
+  changedById String
+  changedBy   User     @relation("ClaimStatusChangedBy", fields: [changedById], references: [id], onDelete: Restrict)
+  createdAt   DateTime @default(now())
+
+  @@index([claimId])
+}

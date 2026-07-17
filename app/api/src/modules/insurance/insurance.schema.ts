@@ -34,6 +34,3 @@ export const claimSearchSchema = z.object({
 export type CreateClaimInput  = z.infer<typeof createClaimSchema>
 export type UpdateClaimInput  = z.infer<typeof updateClaimSchema>
 export type ClaimSearchInput  = z.infer<typeof claimSearchSchema>
-
-
-/

@@ -1,79 +1,65 @@
-// ─── src/config/env.ts ───────────────────────────────────────
-// Validate every env var at startup with Zod.
-// App crashes immediately with a clear message if anything is missing.
+import { z } from 'zod';
 
-import { z } from 'zod'
-
+/**
+ * Every env var the app needs, validated once at startup. If anything is
+ * missing or malformed, the process exits immediately with a clear error
+ * instead of failing mysteriously three requests into production traffic.
+ */
 const envSchema = z.object({
-  NODE_ENV:                z.enum(['development', 'test', 'production']).default('development'),
-  PORT:                    z.coerce.number().default(4000),
-  DATABASE_URL:            z.string().min(1),
-  REDIS_URL:               z.string().min(1),
-  JWT_ACCESS_SECRET:       z.string().min(32),
-  JWT_REFRESH_SECRET:      z.string().min(32),
-  JWT_ACCESS_EXPIRES_IN:   z.string().default('15m'),
-  JWT_REFRESH_EXPIRES_IN:  z.string().default('7d'),
-  API_URL:                 z.string().url(),
-  CLIENT_URL:              z.string().url(),
-  AWS_REGION:              z.string().default('af-south-1'),
-  AWS_ACCESS_KEY_ID:       z.string().optional(),
-  AWS_SECRET_ACCESS_KEY:   z.string().optional(),
-  AWS_S3_BUCKET:           z.string().default('pharmpro-uploads'),
-  AT_API_KEY:              z.string().optional(),
-  AT_USERNAME:             z.string().default('sandbox'),
-  AT_SENDER_ID:            z.string().default('PharmPro'),
-  SMTP_HOST:               z.string().optional(),
-  SMTP_PORT:               z.coerce.number().default(465),
-  SMTP_USER:               z.string().optional(),
-  SMTP_PASS:               z.string().optional(),
-  EMAIL_FROM:              z.string().email().default('noreply@pharmacare.co.ke'),
-  RATE_LIMIT_WINDOW_MS:    z.coerce.number().default(900_000),
-  RATE_LIMIT_MAX:          z.coerce.number().default(100),
-  LOGIN_RATE_LIMIT_MAX:    z.coerce.number().default(10),
-  BCRYPT_ROUNDS:           z.coerce.number().default(12),
-  SEED_ADMIN_EMAIL:        z.string().email().optional(),
-  SEED_ADMIN_PASSWORD:     z.string().optional(),
-  SEED_BRANCH_NAME:        z.string().optional(),
-})
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  PORT: z.coerce.number().int().positive().default(4000),
 
-const parsed = envSchema.safeParse(process.env)
+  DATABASE_URL: z.string().url(),
+  REDIS_URL: z.string().url(),
 
-if (!parsed.success) {
-  console.error('❌ Invalid environment variables:')
-  console.error(parsed.error.flatten().fieldErrors)
-  process.exit(1)
+  JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 characters'),
+  JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
+  JWT_ACCESS_EXPIRY: z.string().default('15m'),
+  JWT_REFRESH_EXPIRY_DAYS: z.coerce.number().int().positive().default(7),
+
+  // M-Pesa Daraja
+  MPESA_CONSUMER_KEY: z.string().optional(),
+  MPESA_CONSUMER_SECRET: z.string().optional(),
+  MPESA_PASSKEY: z.string().optional(),
+  MPESA_SHORTCODE: z.string().optional(),
+  MPESA_ENVIRONMENT: z.enum(['sandbox', 'production']).default('sandbox'),
+  MPESA_CALLBACK_BASE_URL: z.string().url().optional(),
+
+  // AWS S3
+  AWS_REGION: z.string().default('af-south-1'),
+  AWS_ACCESS_KEY_ID: z.string().optional(),
+  AWS_SECRET_ACCESS_KEY: z.string().optional(),
+  S3_BUCKET_NAME: z.string().optional(),
+
+  // Africa's Talking SMS
+  AT_API_KEY: z.string().optional(),
+  AT_USERNAME: z.string().optional(),
+
+  // CORS
+  CORS_ORIGIN: z.string().default('http://localhost:5173'),
+
+  // Rate limiting
+  RATE_LIMIT_GENERAL_MAX: z.coerce.number().int().positive().default(100),
+  RATE_LIMIT_GENERAL_WINDOW_MIN: z.coerce.number().int().positive().default(15),
+  RATE_LIMIT_LOGIN_MAX: z.coerce.number().int().positive().default(10),
+  RATE_LIMIT_LOGIN_WINDOW_MIN: z.coerce.number().int().positive().default(15),
+
+  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
+});
+
+function loadEnv() {
+  const result = envSchema.safeParse(process.env);
+  if (!result.success) {
+    // eslint-disable-next-line no-console
+    console.error('❌ Invalid environment configuration:');
+    for (const issue of result.error.issues) {
+      // eslint-disable-next-line no-console
+      console.error(`  ${issue.path.join('.')}: ${issue.message}`);
+    }
+    process.exit(1);
+  }
+  return result.data;
 }
 
-export const env = parsed.data
-
-
-// ─── src/config/prisma.ts ────────────────────────────────────
-// Prisma singleton — one connection pool for the whole app.
-
-import { PrismaClient } from '@prisma/client'
-import { env } from './env'
-
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient }
-
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: env.NODE_ENV === 'development' ? ['query', 'warn', 'error'] : ['error'],
-  })
-
-if (env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
-
-
-// ─── src/config/redis.ts ─────────────────────────────────────
-// Redis singleton used by: rate limiter, session cache, BullMQ
-
-import { Redis } from 'ioredis'
-import { env } from './env'
-
-export const redis = new Redis(env.REDIS_URL, {
-  maxRetriesPerRequest: null, // required by BullMQ
-  enableReadyCheck: false,
-})
-
-redis.on('connect',  () => console.log('✅ Redis connected'))
-redis.on('error',    (e) => console.error('❌ Redis error', e))
+export const env = loadEnv();
+export type Env = typeof env;

@@ -1,4 +1,4 @@
-/ ════════════════════════════════════════════════════════════
+//════════════════════════════════════════════════════════════
 // modules/insurance/insurance.service.ts
 // Insurance claims lifecycle:
 //  PENDING → APPROVED → PAID
@@ -225,6 +225,3 @@ export const insuranceService = new InsuranceService()
 
 // Expose Prisma for raw query reference
 import { Prisma } from '@prisma/client'
-
-
-/
